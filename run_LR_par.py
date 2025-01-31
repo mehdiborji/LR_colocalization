@@ -7,10 +7,10 @@ from multiprocessing import Pool
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-c", "--cores", type=str)
-parser.add_argument("-f", "--LRs_file", type=str)
+parser.add_argument("-c", "--cores", type=int)
+parser.add_argument("-l", "--LRs_file", type=str)
 parser.add_argument("-p", "--pucks_file", type=str)
-parser.add_argument("-n", "--n_pairs", type=str)
+parser.add_argument("-n", "--n_pairs", type=int)
 parser.add_argument("-m", "--m_pucks", type=int)
 
 args = parser.parse_args()
@@ -22,32 +22,46 @@ n_pairs = args.n_pairs
 m_pucks = args.m_pucks
 
 
-LRs = pd.read_csv(LRs_file, index_col=0)
-LRs["pair"] = LRs["ligand.complex"] + "--" + LRs["receptor.complex"]
+def select_LR_pairs(LRs_file, n_pairs):
+    LRs = pd.read_csv(LRs_file, index_col=0)
 
-pairs = LRs["pair"].unique()
+    LRs["pair"] = LRs["ligand.complex"] + "--" + LRs["receptor.complex"]
 
-#pairs = pd.DataFrame(LRs["pair"].unique())
-#pairs.columns = ["LR"]
-#pairs["ligand"] = pairs["LR"].apply(lambda x: x.split("--")[0])
-#pairs["receptor"] = pairs["LR"].apply(lambda x: x.split("--")[1])
-#pairs.set_index("LR", inplace=True)
+    pairs = LRs["pair"].unique()
 
-datasets = pd.read_csv("CHL_pucks.csv", index_col=0)
-#datasets = datasets.set_index("Puck")
-#datasets = datasets.sort_values(by="total_UMI", ascending=False)
+    if n_pairs is None:
+        return pairs
+    else:
+        return pairs[:n_pairs]
 
+def select_pucks_df(pucks_file, m_pucks):
+    pucks_df = pd.read_csv(pucks_file, index_col=0)
 
-def LR_calcs(LR_pair, puch_adata_path):
+    if m_pucks is None:
+        return pucks_df
+    else:
+        return pucks_df[:m_pucks]
     
-    print(pair, puch_adata_path, "started")
+
+def LR_calcs(LR_pair, pucks_df):
+    
+    print(pair, "started")
 
     ligand_centered = True
     N = 1000
     results = []
     discarded_LR = []
     # for puck in test_pucks:
-    for puck in datasets.index:
+    for pp in range(len(pucks_df)):
+        
+        puck = pucks_df.iloc[pp].puck
+        
+        adata_path = pucks_df.iloc[pp].adata_path
+        
+        patient = pucks_df.iloc[pp].patient
+        
+        print(puck,adata_path,patient)
+        
         ligand = pair.split("--")[0].split("_")
         receptor = pair.split("--")[1].split("_")
 
@@ -170,14 +184,12 @@ def LR_calcs(LR_pair, puch_adata_path):
                 # axr[f].set_title(pair + '  ' + '\n'+str(d)+' pixels radius'+ '\n'+'p = '+str(pval) )
                 # axr[f].axvline(true, 0, ymax=y.max(), color='r')
 
-                pid = puck
-                patient = datasets.loc[puck].patient
-                puck_age = int(pid[:4])
+                
 
                 results.append(
                     [
                         pair,
-                        pid,
+                        puck,
                         patient,
                         pval,
                         true,
@@ -223,6 +235,16 @@ def LR_calcs(LR_pair, puch_adata_path):
         # print(f'pair {pair} has all samples')
 
 
-pool = Pool(60)
-results = pool.map(LR_calcs, pairs.index)
-pool.close()
+pool = Pool(cores)
+
+pairs = select_LR_pairs(LRs_file, n_pairs)
+
+
+pucks_df = select_pucks_df(pucks_file, m_pucks)
+
+args = [(pairs, pucks_df) for pair in pairs]
+
+print(args)
+
+#results = pool.starmap(LR_calcs, args)
+#pool.close()
