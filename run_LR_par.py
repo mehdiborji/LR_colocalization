@@ -4,27 +4,43 @@ import scanpy as sc
 import pandas as pd
 import scipy.spatial as spatial
 from multiprocessing import Pool
+import argparse
 
-mydir = "."
+parser = argparse.ArgumentParser()
+parser.add_argument("-c", "--cores", type=str)
+parser.add_argument("-f", "--LRs_file", type=str)
+parser.add_argument("-p", "--pucks_file", type=str)
+parser.add_argument("-n", "--n_pairs", type=str)
+parser.add_argument("-m", "--m_pucks", type=int)
+
+args = parser.parse_args()
+
+cores = args.cores
+LRs_file = args.LRs_file
+pucks_file = args.pucks_file
+n_pairs = args.n_pairs
+m_pucks = args.m_pucks
+
+
+LRs = pd.read_csv(LRs_file, index_col=0)
+LRs["pair"] = LRs["ligand.complex"] + "--" + LRs["receptor.complex"]
+
+pairs = LRs["pair"].unique()
+
+#pairs = pd.DataFrame(LRs["pair"].unique())
+#pairs.columns = ["LR"]
+#pairs["ligand"] = pairs["LR"].apply(lambda x: x.split("--")[0])
+#pairs["receptor"] = pairs["LR"].apply(lambda x: x.split("--")[1])
+#pairs.set_index("LR", inplace=True)
 
 datasets = pd.read_csv("CHL_pucks.csv", index_col=0)
-# LRs=pd.read_csv('HL_liana_results.csv',index_col=0)
-LRs = pd.read_csv("HL_liana_results_expr_prop_0.01.csv", index_col=0)
-LRs["pair"] = LRs["ligand.complex"] + "--" + LRs["receptor.complex"]
-pairs = pd.DataFrame(LRs["pair"].unique())
-pairs.columns = ["LR"]
-pairs["ligand"] = pairs["LR"].apply(lambda x: x.split("--")[0])
-pairs["receptor"] = pairs["LR"].apply(lambda x: x.split("--")[1])
-pairs.set_index("LR", inplace=True)
-datasets = datasets.set_index("Puck")
-datasets = datasets.sort_values(by="total_UMI", ascending=False)
+#datasets = datasets.set_index("Puck")
+#datasets = datasets.sort_values(by="total_UMI", ascending=False)
 
 
-test_pucks = ["211018_18", "211008_34"]
-
-
-def LR_calcs(pair):
-    print(pair, "started")
+def LR_calcs(LR_pair, puch_adata_path):
+    
+    print(pair, puch_adata_path, "started")
 
     ligand_centered = True
     N = 1000
