@@ -23,6 +23,7 @@ results_dir = args.results_dir
 n_pairs = args.n_pairs
 m_pucks = args.m_pucks
 
+
 def select_LR_pairs(LRs_file, n_pairs):
     LRs = pd.read_csv(LRs_file, index_col=0)
 
@@ -35,6 +36,7 @@ def select_LR_pairs(LRs_file, n_pairs):
     else:
         return pairs[:n_pairs]
 
+
 def select_pucks_df(pucks_file, m_pucks):
     pucks_df = pd.read_csv(pucks_file)
 
@@ -42,13 +44,11 @@ def select_pucks_df(pucks_file, m_pucks):
         return pucks_df
     else:
         return pucks_df[:m_pucks]
-    
+
 
 def LR_calcs(pair, pucks_df, results_dir):
-    
     print(pair, "started")
-    
-    
+
     if not os.path.exists(results_dir):
         try:
             os.makedirs(results_dir)
@@ -57,27 +57,26 @@ def LR_calcs(pair, pucks_df, results_dir):
             print(f"A {e} occurred, {results_dir} have already been created")
     else:
         print(f"{results_dir} already exists")
-    
+
     ligand_centered = True
     N = 100
     results = []
     discarded_LR = []
     # for puck in test_pucks:
     for pp in range(len(pucks_df)):
-        
         puck = pucks_df.iloc[pp].puck
-        
+
         adata_path = pucks_df.iloc[pp].adata_path
-        
+
         patient = pucks_df.iloc[pp].patient
-        
-        print(puck,adata_path,patient)
-        
+
+        print(puck, adata_path, patient)
+
         ligand = pair.split("--")[0].split("_")
         receptor = pair.split("--")[1].split("_")
 
         adata = sc.read(adata_path)
-        
+
         # print(adata.shape)
         bead_thresh = np.quantile(adata.obs.n_genes_by_counts, 0.25)
         bead_thresh = np.max([bead_thresh, 150])
@@ -196,8 +195,6 @@ def LR_calcs(pair, pucks_df, results_dir):
                 # axr[f].set_title(pair + '  ' + '\n'+str(d)+' pixels radius'+ '\n'+'p = '+str(pval) )
                 # axr[f].axvline(true, 0, ymax=y.max(), color='r')
 
-                
-
                 results.append(
                     [
                         pair,
@@ -246,11 +243,12 @@ def LR_calcs(pair, pucks_df, results_dir):
         print(pair, "finished")
         # print(f'pair {pair} has all samples')
 
+
 pairs = select_LR_pairs(LRs_file, n_pairs)
 pucks_df = select_pucks_df(pucks_file, m_pucks)
 args = [(pair, pucks_df, results_dir) for pair in pairs]
 
-#print(args)
+# print(args)
 
 pool = Pool(cores)
 results = pool.starmap(LR_calcs, args)
