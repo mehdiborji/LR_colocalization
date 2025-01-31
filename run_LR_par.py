@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-c", "--cores", type=int)
 parser.add_argument("-l", "--LRs_file", type=str)
 parser.add_argument("-p", "--pucks_file", type=str)
+parser.add_argument("-r", "--results_dir", type=str)
 parser.add_argument("-n", "--n_pairs", type=int)
 parser.add_argument("-m", "--m_pucks", type=int)
 
@@ -18,9 +19,9 @@ args = parser.parse_args()
 cores = args.cores
 LRs_file = args.LRs_file
 pucks_file = args.pucks_file
+results_dir = args.results_dir
 n_pairs = args.n_pairs
 m_pucks = args.m_pucks
-
 
 def select_LR_pairs(LRs_file, n_pairs):
     LRs = pd.read_csv(LRs_file, index_col=0)
@@ -35,7 +36,7 @@ def select_LR_pairs(LRs_file, n_pairs):
         return pairs[:n_pairs]
 
 def select_pucks_df(pucks_file, m_pucks):
-    pucks_df = pd.read_csv(pucks_file, index_col=0)
+    pucks_df = pd.read_csv(pucks_file)
 
     if m_pucks is None:
         return pucks_df
@@ -43,12 +44,22 @@ def select_pucks_df(pucks_file, m_pucks):
         return pucks_df[:m_pucks]
     
 
-def LR_calcs(LR_pair, pucks_df):
+def LR_calcs(pair, pucks_df, results_dir):
     
     print(pair, "started")
-
+    
+    
+    if not os.path.exists(results_dir):
+        try:
+            os.makedirs(results_dir)
+            print(f"{results_dir} created")
+        except Exception as e:
+            print(f"A {e} occurred, {results_dir} have already been created")
+    else:
+        print(f"{results_dir} already exists")
+    
     ligand_centered = True
-    N = 1000
+    N = 100
     results = []
     discarded_LR = []
     # for puck in test_pucks:
@@ -65,7 +76,8 @@ def LR_calcs(LR_pair, pucks_df):
         ligand = pair.split("--")[0].split("_")
         receptor = pair.split("--")[1].split("_")
 
-        adata = sc.read(f"{mydir}/pucks/adata_Puck_{puck}_raw.h5ad")
+        adata = sc.read(adata_path)
+        
         # print(adata.shape)
         bead_thresh = np.quantile(adata.obs.n_genes_by_counts, 0.25)
         bead_thresh = np.max([bead_thresh, 150])
@@ -222,29 +234,24 @@ def LR_calcs(LR_pair, pucks_df):
             "ligand_beads",
         ]
         # print(res)
-        res.to_csv(f"{mydir}/results/results_{pair}.csv")
+        res.to_csv(f"{results_dir}/result_{pair}.csv")
     except:
         print(pair, "finished")
         # print(f'pair {pair} has no sample')
     try:
         dis = pd.DataFrame(discarded_LR)
         dis.columns = ["LR", "puck", "receptor_beads", "ligand_beads"]
-        dis.to_csv(f"{mydir}/results/discard_{pair}.csv")
+        dis.to_csv(f"{results_dir}/discard_{pair}.csv")
     except:
         print(pair, "finished")
         # print(f'pair {pair} has all samples')
 
+pairs = select_LR_pairs(LRs_file, n_pairs)
+pucks_df = select_pucks_df(pucks_file, m_pucks)
+args = [(pair, pucks_df, results_dir) for pair in pairs]
+
+#print(args)
 
 pool = Pool(cores)
-
-pairs = select_LR_pairs(LRs_file, n_pairs)
-
-
-pucks_df = select_pucks_df(pucks_file, m_pucks)
-
-args = [(pairs, pucks_df) for pair in pairs]
-
-print(args)
-
-#results = pool.starmap(LR_calcs, args)
-#pool.close()
+results = pool.starmap(LR_calcs, args)
+pool.close()
